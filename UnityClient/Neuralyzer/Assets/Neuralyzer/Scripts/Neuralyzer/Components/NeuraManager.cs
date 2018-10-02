@@ -393,7 +393,7 @@ namespace Neuralyzer.Components
         {
             var request = new WWW(NeuraCore.Instance.config.ConnectionEndpoint.Replace("ws", "http") +
                                   (NeuraCore.Instance.config.Port != 0 ? ":" + NeuraCore.Instance.config.Port : "") +
-                                  "/api/rooms"); //"https://neuralyzer-exp.hi.jpl.nasa.gov/api/rooms");
+                                  "/api/rooms");
             yield return request;
             ServerIsUp = string.IsNullOrEmpty(request.error); //this lets us know if the server is currently up by assessing the return value from the rooms rest call
             if (request.text != "[]")

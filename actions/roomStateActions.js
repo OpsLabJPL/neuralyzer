@@ -357,18 +357,18 @@ function createOrJoinRoom(roomName, participant) {
       logger.info(`Checking if ${roomName} exists.`);
       const exists = await client.checkRoomExists(roomName);
       let roomCreated = false;
+      const { rooms } = getState().roomState;
       if (exists) {
         // It is totally possible that REDIS reports the room has been created
         // but it hasn't been pushed to the server yet.
         logger.info(`${roomName} exists in Redis. Checking to see if the room is also in local state.`);
-        // It exists, so it should be in our local state. Join that instead.
-        const { rooms } = getState().roomState;
-        for (const roomId in rooms) {
-          if (rooms[roomId].name === roomName) {
-            logger.info(`${roomName} was found in local state.`);
-            roomToJoin = rooms[roomId];
-            break;
-          }
+      }
+      // It exists, so it should be in our local state. Join that instead.
+      for (const roomId in rooms) {
+        if (rooms[roomId].name === roomName) {
+          logger.info(`${roomName} was found in local state.`);
+          roomToJoin = rooms[roomId];
+          break;
         }
       }
       if (!roomToJoin) {

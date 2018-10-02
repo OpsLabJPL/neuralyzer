@@ -19,5 +19,8 @@ namespace Neuralyzer.Core
     public string Device;
     [Tooltip("Seconds after last heartbeat to wait before calling the connection dead")]
     public int TimeOut;
+    [Header("***** This must match the server setting *****")]
+    [Tooltip("Should Neuralyzer use the Flatbuffers Wire Protocol")]
+    public bool UseFlatbuffers;
   }
 }

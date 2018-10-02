@@ -38,8 +38,11 @@ namespace Neuralyzer.Core
 
         #endregion
 
-        [Tooltip("Configuration for your neuralyzer server")] public NeuralyzerConfig config;
-        [Tooltip("for debugging. do not change, may break your connection")] public ConnectionState connectionState;
+        [Tooltip("Configuration for your neuralyzer server")]
+        public NeuralyzerConfig config;
+
+        [Tooltip("for debugging. do not change, may break your connection")]
+        public ConnectionState connectionState;
 
         #region Internal variables
 
@@ -59,9 +62,10 @@ namespace Neuralyzer.Core
         internal string sid;
         internal string uid;
         internal static bool isPaused = false;
-      private string lastRoomJoined;
+        private string lastRoomJoined;
+        private byte[] blipBytes;
 
-      #endregion
+        #endregion
 
         // called when the websocket connection is gracefully closed, or after the connection times out after a hard disconnect
         public event EventHandler<CloseEventArgs> OnClose;
@@ -92,6 +96,7 @@ namespace Neuralyzer.Core
             {
                 print("initial state string not empty");
             }
+
             initialStateArray = initialVal;
         }
 
@@ -101,11 +106,29 @@ namespace Neuralyzer.Core
 #if UNITY_METRO
       var devType = "hololens";
 #else
-      var devType = "browser"; 
+            var devType = "browser";
 #endif
-      lastRoomJoined = roomName;
-            socket.SendArray(ServerMessageFactory.BuildMessage(roomName, userName, uid,
-                devType));
+            lastRoomJoined = roomName;
+            if (config.UseFlatbuffers)
+            {
+                socket.SendArray(ServerMessageFactory.BuildMessage(roomName, userName, uid,
+                    devType));
+            }
+            else
+            {
+                string jReq = JsonConvert.SerializeObject(new
+                {
+                    msgType = "socket:createOrJoinRoom",
+                    data = new
+                    {
+                        room = roomName,
+                        username = userName,
+                        userId = Guid.NewGuid().ToString(),
+                        deviceType = 0
+                    }
+                });
+                socket.SendString(jReq);
+            }
             print("join request sent");
         }
 
@@ -114,12 +137,13 @@ namespace Neuralyzer.Core
 #if UNITY_METRO
       WorldManager.OnPositionalLocatorStateChanged += WorldManager_OnPositionalLocatorStateChanged; 
 #endif
-      instance = this;
+            instance = this;
             Application.runInBackground = true;
             if (!config)
             {
                 Debug.LogError("Config is required");
             }
+
             //DontDestroyOnLoad(gameObject);
             tickWait = new WaitForSeconds(1 / (float) config.UpdateHz);
             eof = new WaitForEndOfFrame();
@@ -138,8 +162,9 @@ namespace Neuralyzer.Core
                 socket.Close("Socket Error");
                 socket = null;
             }
+
             connectionState = ConnectionState.Disconnected;
-      if (OnClose != null)
+            if (OnClose != null)
             {
                 OnClose.Invoke(this, new CloseEventArgs
                 {
@@ -147,6 +172,7 @@ namespace Neuralyzer.Core
                     WasClean = false
                 });
             }
+
             if (OnError != null) OnError.Invoke(this, error);
         }
 
@@ -175,6 +201,7 @@ namespace Neuralyzer.Core
             {
                 yield return w;
             }
+
             if (connectionState == ConnectionState.Disconnected)
             {
                 socket = null;
@@ -190,33 +217,58 @@ namespace Neuralyzer.Core
                         StopCoroutine(timeoutCoroutine);
                     if (e.Reason != "Closed due to user request.")
                     {
-                      print("Triggering reconnect");
-                      NeuraManager.Instance.TriggerAutoJoin();
-                    triggerReconnect = StartCoroutine(TriggerReconnect());
+                        print("Triggering reconnect");
+                        NeuraManager.Instance.TriggerAutoJoin();
+                        triggerReconnect = StartCoroutine(TriggerReconnect());
                     }
                     else
                     {
                         sid = "";
                     }
+
                     if (OnClose != null) OnClose.Invoke(sender, e);
                 };
-                socket.OnError += (sender, e) =>
-                {
-                    errorEventArgs.Enqueue(e);
-                };
+                socket.OnError += (sender, e) => { errorEventArgs.Enqueue(e); };
                 socket.OnMessage += (sender, e) =>
                 {
-                    var bb = new ByteBuffer(e.RawData);
-                    var desMsg = ServerMessage.GetRootAsServerMessage(bb);
-                    // handle heartbeat
-                    if (desMsg.Type == msgType.SocketPulse)
+                    if (config.UseFlatbuffers)
                     {
-                        lastPulse = Time.realtimeSinceStartup;
-                        reconnectAttempts = 0;
-                        reconnectTime = 0.1f;
-                        socket.SendArray(ServerMessageFactory.BuildMessage());
-                        return;
+                        var bb = new ByteBuffer(e.RawData);
+                        var desMsg = ServerMessage.GetRootAsServerMessage(bb);
+                        // handle heartbeat
+                        if (desMsg.Type == msgType.SocketPulse)
+                        {
+                            lastPulse = Time.realtimeSinceStartup;
+                            reconnectAttempts = 0;
+                            reconnectTime = 0.1f;
+                            socket.SendArray(ServerMessageFactory.BuildMessage());
+                            return;
+                        }
                     }
+                    else
+                    {
+                        string stData = e.Data ?? Encoding.UTF8.GetString(e.RawData);
+                        var msg = JsonConvert.DeserializeObject<JSONServerMessage>(stData);
+                        // handle heartbeat
+                        if (msg.msgType == "socket:pulse")
+                        {
+                            lastPulse = Time.realtimeSinceStartup;
+                            reconnectAttempts = 0;
+                            reconnectTime = 0.1f;
+                            if (blipBytes == null)
+                            {
+                                var blip = new JSONServerMessage
+                                {
+                                    msgType = "socket:blip",
+                                    data = null
+                                };
+                                blipBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(blip));
+                            }
+                            socket.SendArray(blipBytes);
+                            return;
+                        }
+                    }
+
                     if (OnMessage != null) OnMessage.Invoke(sender, e);
                 };
                 socket.OnOpen += (sender, e) =>
@@ -257,7 +309,7 @@ namespace Neuralyzer.Core
         private IEnumerator TriggerReconnect()
         {
             yield return new WaitForEndOfFrame();
-            if(isPaused)
+            if (isPaused)
                 yield return new WaitForEndOfFrame();
             while (config.AutoReconnectCount > reconnectAttempts)
             {
@@ -266,8 +318,9 @@ namespace Neuralyzer.Core
                 yield return new WaitForSeconds(reconnectTime);
                 if (reconnectTime < 10f)
                     reconnectTime *= 10;
-                yield return StartCoroutine(Connect());//sid));
+                yield return StartCoroutine(Connect()); //sid));
             }
+
             Debug.LogError("Full time out, check your network connection");
         }
 
@@ -284,6 +337,7 @@ namespace Neuralyzer.Core
                     socket.Close("System Timeout");
                     break;
                 }
+
                 yield return w;
             }
         }
@@ -299,7 +353,14 @@ namespace Neuralyzer.Core
                     yield return eof;
                 }
                 //receive information as soon as possible
-                socket.RecvArray();
+                if (config.UseFlatbuffers)
+                {
+                    socket.RecvArray();
+                }
+                else
+                {
+                    socket.RecvString();
+                }
                 yield return eof;
             }
         }
@@ -317,6 +378,7 @@ namespace Neuralyzer.Core
                     yield return tickWait;
                     continue;
                 }
+
                 // send out delta state changes every tick
                 if (updateArray != null && updateArray.Length > 0 && connectionState == ConnectionState.Connected)
                 {
@@ -325,6 +387,7 @@ namespace Neuralyzer.Core
                     socket.SendArray(updateArray);
                     updateArray = null;
                 }
+
                 yield return tickWait;
             }
         }
@@ -336,7 +399,7 @@ namespace Neuralyzer.Core
     } 
 #endif
 
-    private void OnApplicationQuit()
+        private void OnApplicationQuit()
         {
             //if there is an active socket close it. without this unity will crash if you try to play in editor after stopping.
             Disconnect();

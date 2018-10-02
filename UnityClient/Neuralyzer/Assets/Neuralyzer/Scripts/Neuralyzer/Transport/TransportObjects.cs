@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Globalization;
 using Assets.Neuralyzer.Scripts.Neuralyzer.Transport;
 using FlatBuffers;
 using Neuralyzer.Core;
@@ -16,6 +17,100 @@ using Vector3 = UnityEngine.Vector3;
 /// *********************************************************************************************************************
 namespace Neuralyzer.Transport
 {
+    [Serializable]
+    public class JSONServerMessage
+    {
+        public string msgType;
+        public object data;
+    }
+
+    [Serializable]
+    public class JSONRoomState
+    {
+        public Dictionary<string, string> props;
+        public List<RoomObjectObj> objects;
+
+        public JSONRoomState(JSONRoomState oldStateGen = null)
+        {
+            if (oldStateGen == null)
+            {
+                props = new Dictionary<string, string>();
+                objects = new List<RoomObjectObj>();
+                return;
+            }
+            props = new Dictionary<string, string>(oldStateGen.props);
+            objects = new List<RoomObjectObj>(oldStateGen.objects);
+        }
+
+    }
+    
+    [Serializable]
+    public class JSONStateUpdate
+    {
+        //reserved entries are create, update, and delete
+        public Dictionary<string, string> props;
+        public List<RoomObjectObj> create;
+        public List<RoomObjectObj> update;
+        public List<string> delete;
+
+        public JSONStateUpdate()
+        {
+            props = new Dictionary<string, string>();
+            create = new List<RoomObjectObj>();
+            update = new List<RoomObjectObj>();
+            delete = new List<string>();
+        }
+
+        public void AddObject(RoomObjectObj newObj)
+        {
+            create.Add(newObj);
+        }
+
+        public void RemoveObject(RoomObjectObj remObj)
+        {
+            delete.Add(remObj.id.ToString());
+        }
+
+        public void UpdateObject(RoomObjectObj updObj)
+        {
+            if (update.Any(o=>o.id == updObj.id))
+            {
+                update[update.IndexOf(updObj)] = updObj;
+            }
+            else
+            {
+                update.Add(updObj);
+            }
+        }
+
+        public void UpdateProperty(string prop, bool value)
+        {
+            UpdateProperty(prop, value.ToString());
+        }
+
+        public void UpdateProperty(string prop, int value)
+        {
+            UpdateProperty(prop,value.ToString());
+        }
+
+        public void UpdateProperty(string prop, float value)
+        {
+            UpdateProperty(prop, value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        public void UpdateProperty(string prop, string value)
+        {
+            if (props.ContainsKey(prop))
+            {
+                props[prop] = value;
+            }
+            else
+            {
+                props.Add(prop, value);
+            }
+        }
+    }
+    
     [Serializable]
     public class RoomStateGen
     {

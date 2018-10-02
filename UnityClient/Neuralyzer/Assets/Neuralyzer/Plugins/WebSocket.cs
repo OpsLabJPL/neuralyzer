@@ -91,14 +91,16 @@ public class WebSocket
         Send(arr);
     }
 
-    public void SendString(string blip)
+    public void SendString(string str)
     {
-        SendArray(Encoding.UTF8.GetBytes(blip));
+        SendArray(Encoding.UTF8.GetBytes(str));
     }
-    //public string RecvString()
-    //{
-    //  throw new NotImplementedException();
-    //}
+
+    public string RecvString()
+    {
+        byte[] retval = Recv();
+        return retval == null ? null : Encoding.UTF8.GetString(retval);
+    }
 
     public byte[] RecvArray()
     {
@@ -210,10 +212,7 @@ closeMessage?? "Closed due to user request." });
     public IEnumerator Connect()
     {
         m_Socket = new WebSocketSharp.WebSocket(mUrl.ToString());
-        m_Socket.OnMessage += (sender, e) =>
-        {
-            m_Messages.Enqueue(e.RawData);
-        };
+        m_Socket.OnMessage += (sender, e) => { m_Messages.Enqueue(e.RawData); };
         m_Socket.OnOpen += (sender, e) =>
         {
             m_IsConnected = true;
