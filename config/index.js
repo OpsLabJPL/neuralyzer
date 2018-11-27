@@ -35,6 +35,8 @@ module.exports = {
       cert: process.env.NEURALYZER_SSL_CERT || '',
       key: process.env.NEURALYZER_SSL_KEY || '',
       ca: process.env.NEURALYZER_SSL_CA || '',
+      ciphersuite: process.env.NEURALYZER_SSL_CIPHERSUITE || '',
+      honorcipherorder: process.env.NEURALYZER_SSL_HONORCIPHERORDER || '',
       hsts: process.env.NEURALYZER_HSTS_ENABLED === 'true',
       hstsIncludeSubdomains: process.env.NEURALYZER_HSTS_INCLUDE_SUBDOMAINS === 'true',
       hstsMaxAge,
