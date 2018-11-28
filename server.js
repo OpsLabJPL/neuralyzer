@@ -70,6 +70,8 @@ function setup() {
           cert: await readFileAsync(config.server.ssl.cert, 'utf8'),
         };
         if (config.server.ssl.ca) options.ca = await readFileAsync(config.server.ssl.ca, 'utf8');
+        if (config.server.ssl.ciphersuite) options.ciphers = config.server.ssl.ciphersuite;
+        if (config.server.ssl.honorcipherorder) options.honorcipherorder = config.server.ssl.honorcipherorder;
         httpListener = new HttpsServer(options, app);
         if (config.server.ssl.hsts) app.use(middleware.hsts());
       } else httpListener = Server(app);
