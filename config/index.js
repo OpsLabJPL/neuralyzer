@@ -1,5 +1,6 @@
 
 const uuid = require('uuid/v4');
+const { constants } = require('crypto');
 
 const tickRate = !Number.isNaN(parseInt(process.env.NEURALYZER_TICK_RATE, 10))
   ? parseInt(process.env.NEURALYZER_TICK_RATE, 10)
@@ -39,6 +40,7 @@ module.exports = {
       honorcipherorder: process.env.NEURALYZER_SSL_HONORCIPHERORDER || '',
       hsts: process.env.NEURALYZER_HSTS_ENABLED === 'true',
       hstsIncludeSubdomains: process.env.NEURALYZER_HSTS_INCLUDE_SUBDOMAINS === 'true',
+      secureOptions: constants.SSL_OP_NO_TLSv1,
       hstsMaxAge,
     },
   },

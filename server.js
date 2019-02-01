@@ -68,6 +68,7 @@ function setup() {
         const options = {
           key: await readFileAsync(config.server.ssl.key, 'utf8'),
           cert: await readFileAsync(config.server.ssl.cert, 'utf8'),
+          secureOptions: config.server.ssl.secureOptions,
         };
         if (config.server.ssl.ca) options.ca = await readFileAsync(config.server.ssl.ca, 'utf8');
         if (config.server.ssl.ciphersuite) options.ciphers = config.server.ssl.ciphersuite;
