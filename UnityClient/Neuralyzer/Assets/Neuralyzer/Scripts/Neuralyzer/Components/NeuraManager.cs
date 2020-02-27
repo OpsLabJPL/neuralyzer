@@ -57,10 +57,6 @@ namespace Neuralyzer.Components
         private RoomStateGen oldStateGen;
         private List<GameObject> roomCreatedObjects;
 
-        private string requestedSiteDrive;
-        private TargetPlacementObject requestedPoi;
-        private AnnotationObject requestedAnnotation;
-        private List<AnnotationObject> requestedAnnotationDeletions;
         private string oldSiteDrive = "";
 
         private void Awake()
@@ -244,10 +240,6 @@ namespace Neuralyzer.Components
                 return;
             }
             globalState = new RoomStateGen();
-            requestedSiteDrive = "";
-            requestedPoi = new TargetPlacementObject();
-            requestedAnnotation = new AnnotationObject();
-            requestedAnnotationDeletions = new List<AnnotationObject>();
             NeuraCore.Instance.JoinRoom(roomToJoin, userName);
         }
 
@@ -296,81 +288,7 @@ namespace Neuralyzer.Components
         {
             StartCoroutine(refreshRooms());
         }
-
-        /// <summary>
-        /// Request neuralyzer to change the current scene
-        /// </summary>
-        /// <param name="newSD">The serialized information for the new site drive</param>
-        /// <returns>returns whether neuralyzer will handle the scene change. Will return false if not in a room</returns>
-        public bool RequestSiteDriveChange(string newSD)
-        {
-            //if (!overrideLoad)
-            //  return true;
-            print("is currently in a room " + inRoom);
-            requestedSiteDrive = newSD;
-            return inRoom;
-        }
-
-        /// <summary>
-        /// Requests neuralyzer to place or move the poi.
-        /// </summary>
-        /// <param name="position">The proposed position of the POI</param>
-        /// <returns>Returns whether neuralyzer has handled the request </returns>
-        public bool RequestPOIPlacement(UnityEngine.Vector3 position)
-        {
-            if (!inRoom) // not in a room so do not handle this change
-                return false;
-            if (globalState.poiPlacementObject.isValid && globalState.poiPlacementObject.position == position)
-                return true;
-
-            requestedPoi = new TargetPlacementObject
-            {
-                id = 0,
-                name = "POI",
-                position = position,
-                isValid = true
-            };
-            return true;
-        }
-
-        public bool RequestAddAnnotation(AnnotationObject newAnno)
-        {
-            if (!inRoom) // not in a room so do not handle this change
-                return false;
-
-            //update local state
-            if (globalState.annotationObjects != null &&
-                globalState.annotationObjects.Any(ao => ao.lineId == newAnno.lineId))
-            {
-                globalState.annotationObjects[
-                    globalState.annotationObjects.IndexOf(
-                        globalState.annotationObjects.Single(ao => ao.lineId == newAnno.lineId))] = newAnno;
-            }
-            else
-            {
-                (globalState.annotationObjects ?? (globalState.annotationObjects =
-                     new List<AnnotationObject>())).Add(newAnno);
-            }
-
-            requestedAnnotation = newAnno;
-            return true;
-        }
-
-        public bool RequestDeleteAnnotation(string lineId)
-        {
-            if (!inRoom) // not in a room so do not handle this change
-                return false;
-
-            if (globalState.annotationObjects.Any(ao => ao.lineId == lineId))
-            {
-                (requestedAnnotationDeletions ?? (requestedAnnotationDeletions = new List<AnnotationObject>())).Add(
-                    globalState.annotationObjects[
-                        globalState.annotationObjects.IndexOf(
-                            globalState.annotationObjects.Single(ao => ao.lineId == lineId))]);
-            }
-            return true;
-        }
-
+        
         internal void AddUserObject(int id, ITrackable toAdd)
         {
             print("adding object " + id);
@@ -393,7 +311,7 @@ namespace Neuralyzer.Components
         {
             var request = new WWW(NeuraCore.Instance.config.ConnectionEndpoint.Replace("ws", "http") +
                                   (NeuraCore.Instance.config.Port != 0 ? ":" + NeuraCore.Instance.config.Port : "") +
-                                  "/api/rooms"); //"https://neuralyzer-exp.hi.jpl.nasa.gov/api/rooms");
+                                  "/api/rooms");
             yield return request;
             ServerIsUp = string.IsNullOrEmpty(request.error); //this lets us know if the server is currently up by assessing the return value from the rooms rest call
             if (request.text != "[]")
@@ -433,38 +351,8 @@ namespace Neuralyzer.Components
             #region properties update
 
             bool propsChanged = false;
-            bool isSceneUpdate = false;
-            if (!string.IsNullOrEmpty(serverUpdate.SiteDrive))
-            {
-                propsChanged = true;
-                isSceneUpdate = true;
-            }
-            else
-            {
-                if (serverUpdate.AnnotationsLength > 0)
-                {
-                    propsChanged = true;
-                }
-                if (serverUpdate.Poi.HasValue)
-                {
-                    propsChanged = true;
-                }
-            }
             if (propsChanged)
             {
-                if (isSceneUpdate)
-                {
-                    if (OnPropertiesChanged != null)
-                        OnPropertiesChanged.Invoke(this, serverUpdate);
-                }
-                else
-                {
-                    serverUpdate.Debounce(this, props =>
-                    {
-                        if (OnPropertiesChanged != null)
-                            OnPropertiesChanged.Invoke(this, props);
-                    }, isSceneUpdate);
-                }
             }
 
             #endregion
@@ -510,16 +398,6 @@ namespace Neuralyzer.Components
                     {
                         print("Object " + serverUpdate.Create(i).Value.Id + " already exists");
                     }
-                    //else
-                    //{
-                    //  if (newRoomState.objects.Any(tr => tr.id == serverUpdate.Create(i).Value.Id))
-                    //    newRoomState.objects.Remove(newRoomState.objects.Single(o => o.id == serverUpdate.Create(i).Value.Id));
-                    //  var oldObj = (MonoBehaviour) trackers[serverUpdate.Create(i).Value.Id];
-                    //  if (oldObj) Destroy(oldObj.gameObject);
-                    //  trackers.Remove(serverUpdate.Create(i).Value.Id);
-                    //}
-                    //CreateObject(serverUpdate.Create(i).Value, newRoomState);
-
                 }
             }
             if (serverUpdate.UpdateLength > 0)
@@ -620,43 +498,6 @@ namespace Neuralyzer.Components
             #endregion
 
             #region Property Updates
-
-            if (!string.IsNullOrEmpty(requestedSiteDrive)) //update scene
-            {
-                print("site drive changed in global");
-                var mutState = diffState ?? (diffState = new StateUpdateObject());
-                mutState.siteDrive = requestedSiteDrive;
-                requestedSiteDrive = "";
-                oldSiteDrive = "";
-            }
-
-            if (requestedPoi.isValid)
-            {
-                print("Setting requested poi");
-                var mutState = diffState ?? (diffState = new StateUpdateObject());
-                mutState.PlacePoi(requestedPoi);
-                requestedPoi.isValid = false;
-            }
-
-            if (requestedAnnotation.isValid)
-            {
-                print("Adding requested annotation");
-                var mutState = diffState ?? (diffState = new StateUpdateObject());
-                mutState.AddAnnotation(requestedAnnotation);
-                requestedAnnotation.isValid = false;
-            }
-            if (requestedAnnotationDeletions != null)
-            {
-                var mutState = diffState ?? (diffState = new StateUpdateObject());
-                for (int i = 0; i < requestedAnnotationDeletions.Count; i++)
-                {
-                    var del = requestedAnnotationDeletions[i];
-                    del.positions = new UnityEngine.Vector3[0];
-                    del.isValid = true;
-                    mutState.AddAnnotation(del);
-                }
-                requestedAnnotationDeletions = null;
-            }
 
             #endregion
 

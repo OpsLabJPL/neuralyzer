@@ -8,7 +8,7 @@ using Neuralyzer.Transport;
 using Neuralyzer.Transport.FlatBuffers;
 using Newtonsoft.Json;
 using UnityEngine;
-using UnityEngine.VR.WSA;
+using UnityEngine.XR.WSA;
 using Random = UnityEngine.Random;
 
 namespace Neuralyzer.Core

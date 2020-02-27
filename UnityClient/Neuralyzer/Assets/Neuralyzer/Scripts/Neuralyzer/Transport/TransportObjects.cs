@@ -19,8 +19,6 @@ namespace Neuralyzer.Transport
     [Serializable]
     public class RoomStateGen
     {
-        public TargetPlacementObject poiPlacementObject;
-        public List<AnnotationObject> annotationObjects;
         public string siteDrive;
         public List<RoomObjectObj> objects;
 
@@ -28,14 +26,9 @@ namespace Neuralyzer.Transport
         {
             if (oldStateGen == null)
             {
-                poiPlacementObject = new TargetPlacementObject();
-                poiPlacementObject.isValid = false;
-                annotationObjects = new List<AnnotationObject>();
                 objects = new List<RoomObjectObj>();
                 return;
             }
-            poiPlacementObject = new TargetPlacementObject(oldStateGen.poiPlacementObject);
-            annotationObjects = new List<AnnotationObject>(oldStateGen.annotationObjects);
             objects = new List<RoomObjectObj>(oldStateGen.objects);
         }
     }
@@ -117,12 +110,9 @@ namespace Neuralyzer.Transport
     [Serializable]
     public class StateUpdateObject : IBufferable<StateUpdate>
     {
-        public TargetPlacementObject poiPlacementObject;
-        public List<AnnotationObject> annotationObjects;
         public List<RoomObjectObj> create;
         public List<RoomObjectObj> update;
         public List<int> delete;
-        public string siteDrive;
 
         public StateUpdateObject()
         {
@@ -152,46 +142,11 @@ namespace Neuralyzer.Transport
                 update.Add(updObj);
             }
         }
-
-        public void PlacePoi(TargetPlacementObject newPoi)
-        {
-            poiPlacementObject = newPoi;
-        }
-
-        public void AddAnnotation(AnnotationObject annotation)
-        {
-            (annotationObjects ?? (annotationObjects = new List<AnnotationObject>())).Add(annotation);
-        }
-
+        
         public Offset<StateUpdate> ToBuffer(FlatBufferBuilder builder)
         {
             bool builtPoi = false;
             bool changedSiteDrive = false;
-            StringOffset nsd = new StringOffset();
-            if (!string.IsNullOrEmpty(siteDrive))
-            {
-                nsd = builder.CreateString(siteDrive);
-                changedSiteDrive = true;
-            }
-            Offset<TargetPlacement> tPlacement = new Offset<TargetPlacement>();
-            //build potential updates to the poi
-            if (poiPlacementObject.isValid)
-            {
-                tPlacement = poiPlacementObject.ToBuffer(builder);
-                builtPoi = true;
-            }
-            //build potential new/updated annotations
-            List<Offset<Annotation>> aOffsets = new List<Offset<Annotation>>();
-            if (annotationObjects != null)
-            {
-                for (int j = 0; j < annotationObjects.Count; j++)
-                {
-                    if (annotationObjects[j].isValid)
-                    {
-                        aOffsets.Add(annotationObjects[j].ToBuffer(builder));
-                    }
-                }
-            }
             //build all created room objects
             List<Offset<RoomObject>> roOffsets = new List<Offset<RoomObject>>();
             for (int i = 0; i < create.Count; i++)
@@ -226,16 +181,8 @@ namespace Neuralyzer.Transport
             {
                 updateOffset = StateUpdate.CreateUpdateVector(builder, ruOffsets.ToArray());
             }
-            VectorOffset? annotationOffset = null;
-            if (aOffsets.Count > 0)
-            {
-                annotationOffset = StateUpdate.CreateAnnotationsVector(builder, aOffsets.ToArray());
-            }
             //actually build the buffer
             StateUpdate.StartStateUpdate(builder);
-            if (changedSiteDrive) StateUpdate.AddSiteDrive(builder, nsd);
-            if (builtPoi) StateUpdate.AddPoi(builder, tPlacement);
-            if (annotationOffset != null) StateUpdate.AddAnnotations(builder, (VectorOffset) annotationOffset);
             if (createOffset != null) StateUpdate.AddCreate(builder, (VectorOffset) createOffset);
             if (updateOffset != null) StateUpdate.AddUpdate(builder, (VectorOffset) updateOffset);
             if (deleteOffset != null) StateUpdate.AddDelete(builder, (VectorOffset) deleteOffset);
@@ -292,97 +239,6 @@ namespace Neuralyzer.Transport
     }
 
     [Serializable]
-    public struct TargetPlacementObject : IBufferable<TargetPlacement>
-    {
-        public TargetPlacementObject(TargetPlacement tPlacement)
-        {
-            id = tPlacement.Id;
-            name = tPlacement.Name;
-            position = tPlacement.Position.Value.ToUnityVector();
-            isValid = true;
-        }
-
-        public TargetPlacementObject(TargetPlacementObject poiPlacementObject) : this()
-        {
-            id = poiPlacementObject.id;
-            name = poiPlacementObject.name;
-            position = poiPlacementObject.position;
-            isValid = poiPlacementObject.isValid;
-        }
-
-        public int id;
-        public string name;
-        public Vector3 position;
-        public bool isValid;
-
-        public Offset<TargetPlacement> ToBuffer(FlatBufferBuilder builder)
-        {
-            var poiName = builder.CreateString(name);
-            TargetPlacement.StartTargetPlacement(builder);
-            TargetPlacement.AddId(builder, id);
-            TargetPlacement.AddName(builder, poiName);
-            TargetPlacement.AddPosition(builder, FlatBuffers.Vector3.CreateVector3(builder, position.x,
-                position.y, position.z));
-            return TargetPlacement.EndTargetPlacement(builder);
-        }
-
-        public static bool operator ==(TargetPlacementObject t1, TargetPlacementObject t2)
-        {
-            return t1.isValid == t2.isValid && t1.position == t2.position;
-        }
-
-        public static bool operator !=(TargetPlacementObject t1, TargetPlacementObject t2)
-        {
-            return !(t1 == t2);
-        }
-    }
-
-    [Serializable]
-    public struct AnnotationObject : IBufferable<Annotation>
-    {
-        public string userId;
-        public string lineId;
-        public Vector3[] positions;
-        public bool isValid;
-
-        public Offset<Annotation> ToBuffer(FlatBufferBuilder builder)
-        {
-            var annoLineId = builder.CreateString(lineId);
-            var annoUserId = builder.CreateString(userId);
-            Annotation.StartPositionsVector(builder, positions.Length);
-            for (int i = positions.Length - 1; i >= 0; i--)
-            {
-                FlatBuffers.Vector3.CreateVector3(builder, positions[i].x,
-                    positions[i].y, positions[i].z);
-            }
-            var poss = builder.EndVector();
-
-            Annotation.StartAnnotation(builder);
-            Annotation.AddLineId(builder, annoLineId);
-            Annotation.AddUserId(builder, annoUserId);
-            Annotation.AddPositions(builder, poss);
-            return Annotation.EndAnnotation(builder);
-        }
-
-        public static implicit operator AnnotationObject(Annotation input)
-        {
-            var temp = new AnnotationObject
-            {
-                lineId = input.LineId,
-                userId = input.UserId,
-                positions = new Vector3[input.PositionsLength]
-            };
-            for (int i = 0; i < input.PositionsLength; i++)
-            {
-                temp.positions[i] = new Vector3(input.Positions(i).Value.X, input.Positions(i).Value.Y,
-                    input.Positions(i).Value.Z);
-            }
-            temp.isValid = temp.positions.Length > 0;
-            return temp;
-        }
-    }
-
-    [Serializable]
     public struct OnConnectedArgs
     {
         public string sid;
@@ -405,51 +261,9 @@ namespace Neuralyzer.Transport
 
     public struct PropertiesChangedEventArgs
     {
-        public string SiteDrive;
-        public TargetPlacementObject poiPlacementObject;
-        public List<AnnotationObject> annotationObjects;
-
         public static implicit operator PropertiesChangedEventArgs(StateUpdate sup)
         {
             var temp = new PropertiesChangedEventArgs();
-            if (!string.IsNullOrEmpty(sup.SiteDrive))
-            {
-                temp.SiteDrive = sup.SiteDrive;
-            }
-            if (sup.AnnotationsLength > 0)
-            {
-                temp.annotationObjects = new List<AnnotationObject>();
-                for (int i = 0; i < sup.AnnotationsLength; i++)
-                {
-                    if (!sup.Annotations(i).HasValue)
-                    {
-                        continue;
-                    }
-                    var anoObj = new AnnotationObject();
-                    anoObj.lineId = sup.Annotations(i).Value.LineId;
-                    anoObj.userId = sup.Annotations(i).Value.UserId;
-                    anoObj.positions = new Vector3[sup.Annotations(i).Value.PositionsLength];
-                    for (int j = 0; j < sup.Annotations(i).Value.PositionsLength; j++)
-                    {
-                        anoObj.positions[j] = new Vector3(sup.Annotations(i).Value.Positions(j).Value.X,
-                            sup.Annotations(i).Value.Positions(j).Value.Y,
-                            sup.Annotations(i).Value.Positions(j).Value.Z);
-                    }
-                    anoObj.isValid = true;
-                    temp.annotationObjects.Add(anoObj);
-                }
-            }
-            if (sup.Poi.HasValue)
-            {
-                temp.poiPlacementObject = new TargetPlacementObject
-                {
-                    id = sup.Poi.Value.Id,
-                    name = sup.Poi.Value.Name,
-                    position = new Vector3(sup.Poi.Value.Position.Value.X, sup.Poi.Value.Position.Value.Y,
-                        sup.Poi.Value.Position.Value.Z),
-                    isValid = true
-                };
-            }
             return temp;
         }
     }
@@ -486,7 +300,6 @@ namespace Neuralyzer.Transport
         public static byte[] BuildMessage(RoomStateGen state)
         {
             var sup = new StateUpdateObject();
-            sup.siteDrive = state.siteDrive;
             return BuildMessage(sup);
         }
 
