@@ -40,7 +40,7 @@ module.exports = {
       honorcipherorder: process.env.NEURALYZER_SSL_HONORCIPHERORDER || '',
       hsts: process.env.NEURALYZER_HSTS_ENABLED === 'true',
       hstsIncludeSubdomains: process.env.NEURALYZER_HSTS_INCLUDE_SUBDOMAINS === 'true',
-      secureOptions: constants.SSL_OP_NO_TLSv1,
+      secureOptions: constants.SSL_OP_NO_TLSv1 | constants.SSL_OP_NO_TLSv1_1,
       hstsMaxAge,
     },
   },
