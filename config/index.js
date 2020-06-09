@@ -40,7 +40,7 @@ module.exports = {
       honorcipherorder: process.env.NEURALYZER_SSL_HONORCIPHERORDER || '',
       hsts: process.env.NEURALYZER_HSTS_ENABLED === 'true',
       hstsIncludeSubdomains: process.env.NEURALYZER_HSTS_INCLUDE_SUBDOMAINS === 'true',
-      secureOptions: constants.SSL_OP_NO_TLSv1,
+      secureOptions: constants.SSL_OP_NO_TLSv1 | constants.SSL_OP_NO_TLSv1_1,
       hstsMaxAge,
     },
   },
@@ -63,5 +63,8 @@ module.exports = {
       level: process.env.NEURALYZER_S3_LOG_LEVEL || 'verbose',
       filename: process.env.NEURALYZER_S3_LOG_FILENAME || 'neuralyzer.log',
     },
+  },
+  cors: {
+    origin: process.env.NEURALYZER_CORS_ACCESS_CONTROL_ALLOW_ORIGIN || '*',
   },
 };

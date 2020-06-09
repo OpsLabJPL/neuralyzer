@@ -76,7 +76,13 @@ function setup() {
         httpListener = new HttpsServer(options, app);
         if (config.server.ssl.hsts) app.use(middleware.hsts());
       } else httpListener = Server(app);
-      app.use(cors());
+      app.use((req, res, next) => {
+        res.header('X-Frame-Options', 'sameorigin'); // Do not allow nesting the application in other pages
+        next();
+      });
+      app.use(cors({
+        origin: config.cors.origin,
+      }));
       app.use(cookieParser());
       app.use(bodyParser.json()); // Only support JSON bodies. We're not a forms-based app
       app.use('/api', routes());

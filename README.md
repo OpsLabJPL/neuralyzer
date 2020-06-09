@@ -54,6 +54,7 @@ All of **Neuralyzer's** configuration options can be set through some form of en
 - `NEURALYZER_FLAT_BUFFERS_ENABLED` - Whether or not the Flat Buffer transport protocol will be used to compress and byte pack the messages before they are sent to connected clients. Please see the [Flatbuffer](#flatbuffers) section below for more details.
 - `NEURALYZER_USER_SCHEMA_PATH` - Absolute path to the folder that contains custom compiled JS flatbuffer schemas. Please see the [FlatBuffers](#flatbuffers) section below for more details.
 - `NEURALYZER_USER_MODELS_PATH` - Absolute path to the folder the contains custom JavaScript classes for representing state in Neuralyzer. Please see the [FlatBuffers](#flatbuffers) section below for more details.
+- `NEURALYZER_CORS_ACCESS_CONTROL_ALLOW_ORIGIN` - Value for the Access Control Origin CORS header. Default is "*".
 
 ## Supported Transport Data Formats (and some comments about their performance)
 Neuralyzer supports two over-the-wire data formats out-of-the-box:
