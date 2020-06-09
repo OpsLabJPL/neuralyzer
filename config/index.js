@@ -64,4 +64,7 @@ module.exports = {
       filename: process.env.NEURALYZER_S3_LOG_FILENAME || 'neuralyzer.log',
     },
   },
+  cors: {
+    origin: process.env.NEURALYZER_CORS_ACCESS_CONTROL_ALLOW_ORIGIN || '*',
+  },
 };
